@@ -1,6 +1,8 @@
 // dsh-ssh-mcp — approval guard + path resolver for the ssh-mcp MCP server.
 //
-// Two jobs:
+// Three jobs:
+// 0. Self-heal a freshly installed ssh-mcp's cipher list at activation
+//    (Electron OpenSSL lacks chacha20-poly1305; see selfHealCiphers).
 // 1. Provide the `ssh-mcp-entry` service so the patch rows stay free of
 //    machine-specific absolute paths: entryPath is resolved from this
 //    package's own directory, configPath from XDG defaults (or row config).
@@ -44,9 +46,41 @@ export function resolveSshMcpRoot(fromUrl) {
   }
 }
 
+// Electron's bundled OpenSSL has no chacha20-poly1305 (AES-GCM/CTR are fine)
+// and ssh2 rejects the pinned list entry before the handshake even starts.
+// The guard row activates strictly before the server row (row `inject`
+// guarantees the order), so we repair the freshly installed dependency here.
+// Idempotent; refuses to touch unexpected file layouts; logs every outcome.
+function selfHealCiphers(mcpRoot) {
+  const p = path.join(mcpRoot, 'build', 'ssh', 'algorithms.js')
+  let src
+  try {
+    src = fs.readFileSync(p, 'utf8')
+  } catch {
+    return // non-standard package layout: resolveEntry will surface it
+  }
+  if (!src.includes("'chacha20-poly1305@openssh.com',")) return // already good
+  let out = src.replace(/\n\s*'chacha20-poly1305@openssh\.com',/, '')
+  out = out.replace(
+    'cipher: [...FROZEN_ALGORITHMS.cipher.filter((c) => c !== CHACHA20), CHACHA20],',
+    'cipher: [...FROZEN_ALGORITHMS.cipher],',
+  )
+  if (out.includes("'chacha20-poly1305@openssh.com',")) {
+    console.error('[dsh-ssh-mcp] unexpected algorithms.js layout, leaving untouched:', p)
+    return
+  }
+  try {
+    fs.writeFileSync(p, out)
+    console.error('[dsh-ssh-mcp] applied Electron cipher patch:', p)
+  } catch (e) {
+    console.error('[dsh-ssh-mcp] cipher patch write failed:', e.message)
+  }
+}
+
 function resolveEntry() {
   const mcpRoot = resolveSshMcpRoot()
   if (mcpRoot) {
+    selfHealCiphers(mcpRoot)
     try {
       return fs.realpathSync(path.join(mcpRoot, 'build', 'index.js'))
     } catch {}

@@ -38,18 +38,18 @@ Password auth: the ssh-mcp server reads `SSH_MCP_PASSWORD` / `SSH_MCP_<PROFILE>_
 
 Plugins → Add plugin → point at a clone of this repo, or have your agent run `install_bundle` with the repo path (or `github:aningQwQ/dsh-ssh-mcp`).
 
-### 3. Initialize dependencies (one time, in the bundle directory)
+### 3. Dependencies
 
-Local-directory bundles are **linked**, not copied, and pnpm does not auto-install a linked package's dependencies. Run, in this repo's directory:
+- **Installed from GitHub or npm:** nothing to do. pnpm installs `ssh-mcp` with the package, and the guard **self-heals** the Electron cipher incompatibility (see below) at every activation — logged as `applied Electron cipher patch` in the host log.
+- **Installed from a local directory (linked checkout):** pnpm does not auto-install a linked package's dependencies. Run once, in this repo's directory:
 
 ```sh
 pnpm install --ignore-scripts
-node scripts/reapply-patch.mjs
 ```
 
 If you don't have system node/pnpm, paste this to your DSH agent:
 
-> In the dsh-ssh-mcp bundle directory (find it with plugin_manager `list_bundles` / `list_plugins`), run `pnpm install --ignore-scripts` and then `node scripts/reapply-patch.mjs`, using DSH's own runtime: prefix both commands with `ELECTRON_RUN_AS_NODE=1` and use the `dsh-desktop-next` binary as the interpreter, with the bundled `pnpm.mjs` from `app.asar.unpacked/node_modules/pnpm/bin/`. Do not approve native build scripts; the pure-JS fallback is what the patch expects.
+> In the dsh-ssh-mcp bundle directory (find it with plugin_manager `list_bundles` / `list_plugins`), run `pnpm install --ignore-scripts` using DSH's own runtime: prefix the command with `ELECTRON_RUN_AS_NODE=1`, use the `dsh-desktop-next` binary as the interpreter and the bundled `pnpm.mjs` from `app.asar.unpacked/node_modules/pnpm/bin/`. Do not approve native build scripts; the pure-JS fallback is what the cipher patch expects.
 
 Then enable/reload the bundle and ask your agent to call `mcp__ssh__list-connections`.
 
