@@ -1,8 +1,10 @@
 // dsh-ssh-mcp — approval guard + path resolver for the ssh-mcp MCP server.
 //
-// Three jobs:
-// 0. Self-heal a freshly installed ssh-mcp's cipher list at activation
-//    (Electron OpenSSL lacks chacha20-poly1305; see selfHealCiphers).
+// Four jobs:
+// 0. Self-heal a freshly installed ssh-mcp at activation: drop the
+//    chacha20-poly1305 cipher entry Electron's OpenSSL can't negotiate
+//    (selfHealCiphers) and make the background-session tool text honest
+//    (selfHealToolText). Both idempotent; refuse unexpected layouts.
 // 1. Provide the `ssh-mcp-entry` service so the patch rows stay free of
 //    machine-specific absolute paths: entryPath is resolved from this
 //    package's own directory, configPath from XDG defaults (or row config).
@@ -77,10 +79,82 @@ function selfHealCiphers(mcpRoot) {
   }
 }
 
+// Honest lifecycle documentation patch (pure strings, no logic):
+// ssh-mcp background sessions are removed the moment their command exits,
+// but the shipped tool text implies they persist ("e.g., tail -f logs") and
+// the not-found error gives no cause or remedy. Agents burned rounds on it.
+// Same discipline as the cipher patch: idempotent, refuses unexpected text.
+function patchStrings(p, edits, tag) {
+  let src
+  try {
+    src = fs.readFileSync(p, 'utf8')
+  } catch {
+    return
+  }
+  let changed = false
+  for (const e of edits) {
+    if (src.includes(e.find)) {
+      src = src.replace(e.find, e.replace)
+      changed = true
+      continue
+    }
+    if (src.includes(e.marker)) continue // this edit already applied
+    console.error(`[dsh-ssh-mcp] ${tag}: unexpected text, left untouched: ${p}`)
+    return // refuse to write a partially understood file
+  }
+  if (!changed) return
+  try {
+    fs.writeFileSync(p, src)
+    console.error(`[dsh-ssh-mcp] applied ${tag}:`, p)
+  } catch (e) {
+    console.error(`[dsh-ssh-mcp] ${tag} write failed:`, e.message)
+  }
+}
+
+function selfHealToolText(mcpRoot) {
+  patchStrings(
+    path.join(mcpRoot, 'build', 'tools', 'descriptions.js'),
+    [
+      {
+        find: `'open-session': 'Open a named session on a remote host. Use type="interactive" for stateful shell (CWD/env persists between commands) or type="background" for long-running processes.',`,
+        replace:
+          `'open-session': 'Open a named session on a remote host. Use type="interactive" for stateful shell (CWD/env persists between commands) or type="background" for long-running processes. A background session exists only while its command runs; when the command exits the session is removed together with its buffered output.',`,
+        marker: 'exists only while its command runs',
+      },
+      {
+        find: `'close-session': 'Close a named session. A background session\\'s command is signalled on the host (INT, then TERM, then KILL) before its channel is dropped; an interactive session\\'s shell is ended. The response says so if the command could not be signalled or had not stopped in time.',`,
+        replace:
+          `'close-session': 'Close a named session. A background session\\'s command is signalled on the host (INT, then TERM, then KILL) before its channel is dropped; an interactive session\\'s shell is ended. The response says so if the command could not be signalled or had not stopped in time. A finished background session is already gone; closing is only for running ones.',`,
+        marker: 'closing is only for running ones',
+      },
+      {
+        find: `'read-session-output': 'Read recent output from a background session (e.g., tail -f logs).',`,
+        replace:
+          `'read-session-output': 'Read recent output from a background session (e.g., tail -f logs). Only valid while the command is still running: when it exits, the session is removed and this reports it as not found. To read results after completion, redirect the command output to a file and use read-command on it.',`,
+        marker: 'Only valid while the command is still running',
+      },
+    ],
+    'tool-text patch (descriptions)',
+  )
+  patchStrings(
+    path.join(mcpRoot, 'build', 'tools', 'session-tools.js'),
+    [
+      {
+        find: '`Background session "${name}" not found.`',
+        replace:
+          '`Background session "${name}" not found (a background session is removed when its command exits; to read results after completion, redirect output to a file and use read-command).`',
+        marker: 'removed when its command exits',
+      },
+    ],
+    'tool-text patch (error hint)',
+  )
+}
+
 function resolveEntry() {
   const mcpRoot = resolveSshMcpRoot()
   if (mcpRoot) {
     selfHealCiphers(mcpRoot)
+    selfHealToolText(mcpRoot)
     try {
       return fs.realpathSync(path.join(mcpRoot, 'build', 'index.js'))
     } catch {}

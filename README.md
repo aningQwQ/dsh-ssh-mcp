@@ -40,7 +40,7 @@ Plugins → Add plugin → point at a clone of this repo, or have your agent run
 
 ### 3. Dependencies
 
-- **Installed from GitHub or npm:** nothing to do. pnpm installs `ssh-mcp` with the package, and the guard **self-heals** the Electron cipher incompatibility (see below) at every activation — logged as `applied Electron cipher patch` in the host log.
+- **Installed from GitHub or npm:** nothing to do. pnpm installs `ssh-mcp` with the package, and the guard **self-heals** two incompatibilities at every activation (logged in the host log as `applied Electron cipher patch` / `applied tool-text patch`): the chacha20 cipher entry (see below) and the background-session tool text (see below).
 - **Installed from a local directory (linked checkout):** pnpm does not auto-install a linked package's dependencies. Run once, in this repo's directory:
 
 ```sh
@@ -52,6 +52,10 @@ If you don't have system node/pnpm, paste this to your DSH agent:
 > In the dsh-ssh-mcp bundle directory (find it with plugin_manager `list_bundles` / `list_plugins`), run `pnpm install --ignore-scripts` using DSH's own runtime: prefix the command with `ELECTRON_RUN_AS_NODE=1`, use the `dsh-desktop-next` binary as the interpreter and the bundled `pnpm.mjs` from `app.asar.unpacked/node_modules/pnpm/bin/`. Do not approve native build scripts; the pure-JS fallback is what the cipher patch expects.
 
 Then enable/reload the bundle and ask your agent to call `mcp__ssh__list-connections`.
+
+## Why the tool-text patch exists
+
+ssh-mcp background sessions are removed the moment their command exits — buffered output included — but the shipped tool descriptions imply they persist (`read-session-output ... e.g., tail -f logs`) and the `not found` error states neither cause nor remedy. Agents reliably burn rounds rediscovering this. The guard patches four strings (three descriptions + one error hint) to document the real lifecycle and point at the durable pattern: redirect command output to a file, read it back with `read-command`. Pure text, idempotent, refuses unexpected layouts; if upstream ships honest wording, the patch becomes a no-op.
 
 ## Why the cipher patch exists
 

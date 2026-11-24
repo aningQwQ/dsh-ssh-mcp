@@ -1,6 +1,6 @@
 {
   "name": "dsh-ssh-mcp",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": false,
   "description": "SSH server management for DeepSeek Harness via ssh-mcp, with DSH-native approval prompts for destructive remote calls.",
   "type": "module",

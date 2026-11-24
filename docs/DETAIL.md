@@ -6,7 +6,7 @@
 
 - 16 个远程工具,以 `mcp__ssh__*` 出现:`read-command`(只读白名单)、`run-command`、有状态交互会话(`open-session` + `session=`)、后台会话、SFTP 传输、进程信号、`list-connections`。
 - 审批:服务端跑 `client-tool` 模式(DSH 的 MCP 桥不支持 elicitation),本 bundle 的守卫行在 `tools/pre-execute` 把 `destructive-command`、`privileged-command`、上传类与交互式会话转成 DSH 原生确认弹窗;拒绝 = 命令不触达服务器。
-- 补丁:自动为 ssh-mcp 去除 chacha20-poly1305 协商项(Electron OpenSSL 无此算法,否则连不上现代 OpenSSH)。
+- 补丁:守卫激活时自动修两处——① 去除 ssh-mcp 的 chacha20-poly1305 协商项(Electron OpenSSL 无此算法,否则连不上现代 OpenSSH);② 把后台会话相关工具文案改诚实(会话随命令结束即销毁、事后读会 not found、出路是输出重定向到文件再用 read-command 读)。均幂等,上游修好后自动跳过。
 
 ## 使用前提(一次性)
 
