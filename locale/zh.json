@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "SSH 远程控制 (ssh-mcp)",
+    "description": "通过 MCP 接入 ssh-mcp,让 agent 管理 Linux 主机;危险远程调用由 DSH 原生确认弹窗把关。需要自备 config.toml 并做一次依赖初始化。",
+    "detail": "docs/DETAIL.md"
+  }
+}

@@ -1,0 +1,23 @@
+- insert:
+    - id: ssh-mcp-guard
+      name: dsh-ssh-mcp
+      config:
+        serverName: ssh
+        enabled: true
+    - id: ssh-mcp-server
+      name: '@deepseek-ai/dsh-mcp-client'
+      inject: [ssh-mcp-entry]
+      config:
+        serverName: ssh
+        transport: stdio
+        command: !!js process.execPath
+        args:
+          - !!js ctx.get('ssh-mcp-entry').entryPath
+          - !!js ctx.get('ssh-mcp-entry').configArg
+        env:
+          ELECTRON_RUN_AS_NODE: '1'
+          SSH_MCP_PASSWORD: '${credential:ssh_mcp_password}'
+        expandTemplates: true
+        startupTimeoutMs: 20000
+        toolCallTimeoutMs: 120000
+        failOnStartupError: false

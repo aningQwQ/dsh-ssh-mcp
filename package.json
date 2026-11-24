@@ -1,0 +1,27 @@
+{
+  "name": "dsh-ssh-mcp",
+  "version": "0.1.0",
+  "private": false,
+  "description": "SSH server management for DeepSeek Harness via ssh-mcp, with DSH-native approval prompts for destructive remote calls.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aningQwQ/dsh-ssh-mcp.git"
+  },
+  "keywords": ["dsh", "cordis", "bundle", "mcp", "ssh", "ssh-mcp"],
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": ["index.js", "cordis.patch.yml", "locale/*.json", "docs", "scripts", "icon.svg", "LICENSE"],
+  "dependencies": {
+    "ssh-mcp": "2.28.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

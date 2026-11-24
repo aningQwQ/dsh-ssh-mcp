@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "SSH remote control (ssh-mcp)",
+    "description": "Connects ssh-mcp over MCP so the agent can manage Linux hosts. Destructive remote calls are gated by native DSH approval prompts. Requires an ssh-mcp config.toml and a one-time dependency setup.",
+    "detail": "docs/DETAIL.md"
+  }
+}
