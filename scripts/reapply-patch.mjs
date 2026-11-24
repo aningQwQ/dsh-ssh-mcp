@@ -8,22 +8,43 @@
 // servers that offer AES negotiate normally; a chacha20-ONLY server would
 // fail, which real sshd never is since GCM/CTR are OpenSSH defaults).
 //
-// Run this after every `pnpm install` in this package directory:
+// Run this after every fresh install of this bundle's ssh-mcp dependency
+// (works in both linked-checkout and packed/hoisted layouts):
 //   ELECTRON_RUN_AS_NODE=1 <dsh-binary> scripts/reapply-patch.mjs
 //   (or with any system node: node scripts/reapply-patch.mjs)
-import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const pnpmDir = join(root, 'node_modules', '.pnpm')
-const targets = readdirSync(pnpmDir)
-  .filter((d) => d.startsWith('ssh-mcp@'))
-  .map((d) => join(pnpmDir, d, 'node_modules', 'ssh-mcp', 'build', 'ssh', 'algorithms.js'))
-  .filter((p) => existsSync(p))
 
+function candidates() {
+  const out = []
+  // linked-checkout layout: package-local virtual store
+  const pnpmDir = join(root, 'node_modules', '.pnpm')
+  if (existsSync(pnpmDir)) {
+    for (const d of readdirSync(pnpmDir)) {
+      if (!d.startsWith('ssh-mcp@')) continue
+      const p = join(pnpmDir, d, 'node_modules', 'ssh-mcp', 'build', 'ssh', 'algorithms.js')
+      if (existsSync(p)) out.push(p)
+    }
+  }
+  // both layouts: resolve through the module graph (hoisted or nested)
+  try {
+    const pkgJson = createRequire(import.meta.url).resolve('ssh-mcp/package.json')
+    const p = join(dirname(pkgJson), 'build', 'ssh', 'algorithms.js')
+    if (existsSync(p) && !out.includes(p)) out.push(p)
+  } catch {}
+  return out
+}
+
+const targets = candidates()
 if (!targets.length) {
-  console.error('reapply-patch: ssh-mcp not installed yet — run `pnpm install` first')
+  console.error(
+    'reapply-patch: ssh-mcp not resolvable from this package — install its dependencies first ' +
+      '(README Setup step 3).',
+  )
   process.exit(1)
 }
 for (const p of targets) {

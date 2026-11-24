@@ -15,6 +15,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
 export const inject = ['tools']
@@ -29,17 +30,32 @@ const DEFAULT_GATED = [
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 
-function resolveEntry() {
-  const link = path.join(root, 'node_modules', 'ssh-mcp', 'build', 'index.js')
+// Locate the ssh-mcp entry across install layouts:
+//  - linked-checkout dev: <pkg>/node_modules/ssh-mcp (pnpm virtual store)
+//  - packed/hoisted install: ssh-mcp hoisted beside the package (profile root)
+export function resolveSshMcpRoot(fromUrl) {
+  const local = path.join(root, 'node_modules', 'ssh-mcp')
+  if (fs.existsSync(path.join(local, 'build', 'index.js'))) return local
   try {
-    return fs.realpathSync(link)
+    const req = createRequire(fromUrl || import.meta.url)
+    return path.dirname(req.resolve('ssh-mcp/package.json'))
   } catch {
-    console.error(
-      '[dsh-ssh-mcp] ssh-mcp dependency not found — in this package directory run `pnpm install` ' +
-        'then `node scripts/reapply-patch.mjs` (details: README.md), then reload the bundle.',
-    )
-    return link
+    return null
   }
+}
+
+function resolveEntry() {
+  const mcpRoot = resolveSshMcpRoot()
+  if (mcpRoot) {
+    try {
+      return fs.realpathSync(path.join(mcpRoot, 'build', 'index.js'))
+    } catch {}
+  }
+  console.error(
+    '[dsh-ssh-mcp] ssh-mcp dependency not found — see README Setup step 3 (dependency init), ' +
+      'then reload the bundle.',
+  )
+  return path.join(root, 'node_modules', 'ssh-mcp', 'build', 'index.js')
 }
 
 function defaultConfigPath() {

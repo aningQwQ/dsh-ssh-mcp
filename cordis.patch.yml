@@ -6,7 +6,7 @@
         enabled: true
     - id: ssh-mcp-server
       name: '@deepseek-ai/dsh-mcp-client'
-      inject: [ssh-mcp-entry]
+      inject: [ssh-mcp-entry, credentials]
       config:
         serverName: ssh
         transport: stdio
